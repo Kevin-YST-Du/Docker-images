@@ -1,7 +1,7 @@
 name: Build All Platforms (Release)
 
 on:
-  workflow_dispatch: # 建议手动触发，避免每次 Push 都跑几十个 G 的流量
+  workflow_dispatch: # 手动触发
     inputs:
       tag_name:
         description: '发布版本号 (例如 v1.3.0)'
@@ -9,7 +9,7 @@ on:
         default: 'nightly'
 
 permissions:
-  contents: write # 允许发布 Release
+  contents: write # 必须有权限才能发布 Release
 
 jobs:
   # =================================================
@@ -38,7 +38,6 @@ jobs:
           ./vcpkg/vcpkg install libvpx:x64-windows-static libyuv:x64-windows-static opus:x64-windows-static aom:x64-windows-static
 
       - name: Build Windows
-        # 这里使用 RustDesk 自带的 build.py 脚本
         run: |
           pip install -r requirements.txt
           python build.py --windows
@@ -107,7 +106,6 @@ jobs:
           channel: 'stable'
 
       - name: Build macOS
-        # 注意：没有苹果开发者证书，构建出的 .dmg 安装时会提示“未签名”
         run: |
           pip3 install -r requirements.txt
           python3 build.py --macos
@@ -146,7 +144,6 @@ jobs:
           channel: 'stable'
 
       - name: Build Android
-        # 注意：这里构建的是通用 APK (Universal)
         run: |
           pip3 install -r requirements.txt
           python3 build.py --android
@@ -157,7 +154,7 @@ jobs:
           name: android-binary
           path: build/app/outputs/flutter-apk/*.apk
 
-# =================================================
+  # =================================================
   # 5. 发布到 GitHub Releases
   # =================================================
   publish-release:
@@ -167,7 +164,11 @@ jobs:
       - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
-          path: artifacts # 将所有文件下载到 artifacts 目录，结构更清晰
+          path: artifacts
+
+      # 调试步骤：列出文件，如果发布失败查看此日志
+      - name: List files (Debug)
+        run: ls -R artifacts
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
@@ -176,7 +177,6 @@ jobs:
           name: RustDesk Custom Build ${{ inputs.tag_name }}
           draft: false
           prerelease: false
-          # 注意：这里的 files 每一行前面必须有空格缩进
           files: |
             artifacts/windows-binary/*.exe
             artifacts/linux-binary/*.deb
