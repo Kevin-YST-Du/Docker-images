@@ -1,20 +1,17 @@
-name: Build All Platforms (Release)
+name: Build All Platforms
 
 on:
-  workflow_dispatch: # 手动触发
+  workflow_dispatch:
     inputs:
       tag_name:
-        description: '发布版本号 (例如 v1.3.0)'
+        description: 'Version Tag (e.g. v1.0.0)'
         required: true
         default: 'nightly'
 
 permissions:
-  contents: write # 必须有权限才能发布 Release
+  contents: write
 
 jobs:
-  # =================================================
-  # 1. 构建 Windows 版本
-  # =================================================
   build-windows:
     runs-on: windows-2022
     steps:
@@ -22,35 +19,24 @@ jobs:
         with:
           repository: rustdesk/rustdesk
           ref: master
-
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Install Flutter
-        uses: subosito/flutter-action@v2
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: subosito/flutter-action@v2
         with:
           channel: 'stable'
-
-      - name: Install vcpkg & dependencies
+      - name: Install dependencies
         run: |
           git clone https://github.com/microsoft/vcpkg.git
           ./vcpkg/bootstrap-vcpkg.bat
           ./vcpkg/vcpkg install libvpx:x64-windows-static libyuv:x64-windows-static opus:x64-windows-static aom:x64-windows-static
-
-      - name: Build Windows
+      - name: Build
         run: |
           pip install -r requirements.txt
           python build.py --windows
-
-      - name: Upload Artifact
-        uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v4
         with:
           name: windows-binary
           path: build/windows/runner/Release/*.exe
 
-  # =================================================
-  # 2. 构建 Linux 版本 (Ubuntu/Debian)
-  # =================================================
   build-linux:
     runs-on: ubuntu-22.04
     steps:
@@ -58,37 +44,25 @@ jobs:
         with:
           repository: rustdesk/rustdesk
           ref: master
-
-      - name: Install Dependencies
+      - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev \
-              libgtk-3-dev libappindicator3-dev libxdo-dev libayatana-appindicator3-dev
-
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Install Flutter
-        uses: subosito/flutter-action@v2
+          sudo apt-get install -y libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev libgtk-3-dev libappindicator3-dev libxdo-dev libayatana-appindicator3-dev
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: subosito/flutter-action@v2
         with:
           channel: 'stable'
-
-      - name: Build Linux
+      - name: Build
         run: |
           pip3 install -r requirements.txt
           python3 build.py --linux
-
-      - name: Upload Artifact
-        uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v4
         with:
           name: linux-binary
           path: |
             *.deb
             *.AppImage
 
-  # =================================================
-  # 3. 构建 macOS 版本
-  # =================================================
   build-macos:
     runs-on: macos-latest
     steps:
@@ -96,29 +70,19 @@ jobs:
         with:
           repository: rustdesk/rustdesk
           ref: master
-
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Install Flutter
-        uses: subosito/flutter-action@v2
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: subosito/flutter-action@v2
         with:
           channel: 'stable'
-
-      - name: Build macOS
+      - name: Build
         run: |
           pip3 install -r requirements.txt
           python3 build.py --macos
-
-      - name: Upload Artifact
-        uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v4
         with:
           name: macos-binary
           path: *.dmg
 
-  # =================================================
-  # 4. 构建 Android 版本
-  # =================================================
   build-android:
     runs-on: ubuntu-latest
     steps:
@@ -126,56 +90,37 @@ jobs:
         with:
           repository: rustdesk/rustdesk
           ref: master
-
-      - name: Setup Java
-        uses: actions/setup-java@v4
+      - uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: '17'
-
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@stable
         with:
           targets: aarch64-linux-android armv7-linux-androideabi x86_64-linux-android
-
-      - name: Install Flutter
-        uses: subosito/flutter-action@v2
+      - uses: subosito/flutter-action@v2
         with:
           channel: 'stable'
-
-      - name: Build Android
+      - name: Build
         run: |
           pip3 install -r requirements.txt
           python3 build.py --android
-
-      - name: Upload Artifact
-        uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v4
         with:
           name: android-binary
           path: build/app/outputs/flutter-apk/*.apk
 
-  # =================================================
-  # 5. 发布到 GitHub Releases
-  # =================================================
   publish-release:
     needs: [build-windows, build-linux, build-macos, build-android]
     runs-on: ubuntu-latest
     steps:
-      - name: Download all artifacts
-        uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v4
         with:
           path: artifacts
-
-      - name: List files (Debug)
-        run: ls -R artifacts
-
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ inputs.tag_name }}
-          name: RustDesk Custom Build ${{ inputs.tag_name }}
-          draft: false
-          prerelease: false
+          name: Release ${{ inputs.tag_name }}
           files: |
             artifacts/windows-binary/*.exe
             artifacts/linux-binary/*.deb
