@@ -157,7 +157,7 @@ jobs:
           name: android-binary
           path: build/app/outputs/flutter-apk/*.apk
 
-  # =================================================
+# =================================================
   # 5. 发布到 GitHub Releases
   # =================================================
   publish-release:
@@ -166,17 +166,20 @@ jobs:
     steps:
       - name: Download all artifacts
         uses: actions/download-artifact@v4
+        with:
+          path: artifacts # 将所有文件下载到 artifacts 目录，结构更清晰
 
       - name: Create Release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ inputs.tag_name }}
           name: RustDesk Custom Build ${{ inputs.tag_name }}
           draft: false
           prerelease: false
+          # 注意：这里的 files 每一行前面必须有空格缩进
           files: |
-            windows-binary/*.exe
-            linux-binary/*.deb
-            linux-binary/*.AppImage
-            macos-binary/*.dmg
-            android-binary/*.apk
+            artifacts/windows-binary/*.exe
+            artifacts/linux-binary/*.deb
+            artifacts/linux-binary/*.AppImage
+            artifacts/macos-binary/*.dmg
+            artifacts/android-binary/*.apk
