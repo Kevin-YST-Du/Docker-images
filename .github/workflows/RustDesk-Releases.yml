@@ -166,7 +166,6 @@ jobs:
         with:
           path: artifacts
 
-      # 调试步骤：列出文件，如果发布失败查看此日志
       - name: List files (Debug)
         run: ls -R artifacts
 
