@@ -3,9 +3,9 @@ name: Build and Push Official RustDesk
 on:
   push:
     branches: [ "master", "main" ]
-  workflow_dispatch: # 允许手动触发
+  workflow_dispatch: # 允许手动点击触发
   schedule:
-    - cron: '0 2 * * *' # 可选：每天凌晨2点自动拉取最新代码构建一次
+    - cron: '0 2 * * *' # 可选：每天凌晨2点自动构建
 
 permissions:
   contents: read
@@ -15,14 +15,21 @@ jobs:
   build-and-push:
     runs-on: ubuntu-latest
     steps:
-      # 1. 登录 Docker Hub
+      # 1. 拉取官方 RustDesk 代码
+      - name: Checkout upstream RustDesk code
+        uses: actions/checkout@v4
+        with:
+          repository: rustdesk/rustdesk # 目标仓库
+          ref: master                   # 目标分支
+
+      # 2. 登录 Docker Hub
       - name: Login to Docker Hub
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      # 2. 登录 GitHub Container Registry (GHCR)
+      # 3. 登录 GitHub Container Registry (GHCR)
       - name: Login to GitHub Container Registry
         uses: docker/login-action@v3
         with:
@@ -30,28 +37,21 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # 3. 拉取官方 RustDesk 代码 (关键修改步骤)
-      - name: Checkout upstream RustDesk code
-        uses: actions/checkout@v4
-        with:
-          repository: rustdesk/rustdesk # 指定拉取官方仓库
-          ref: master                   # 拉取 master 分支
-          # fetch-depth: 1              # (可选) 浅克隆，加快速度
-
-      # 4. 设置 Docker Buildx
+      # 4. 设置 Docker Buildx (缓存功能必须)
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      # 5. 构建并推送
-      # 因为第3步已经把 rustdesk 的代码拉到了工作目录根目录
-      # 所以这里 context 依然是 "."
+      # 5. 构建并推送 (含缓存配置)
       - name: Build and push
         uses: docker/build-push-action@v6
         with:
           context: .
-          file: ./Dockerfile # 确保官方仓库根目录有 Dockerfile
+          file: ./Dockerfile
           push: true
+          # 修复点：移除了中文注释，手动将用户名改成全小写
           tags: |
             ${{ secrets.DOCKERHUB_USERNAME }}/rustdesk-builder:latest
-            ghcr.io/${{ github.repository_owner }}/rustdesk-builder:latest
-            # 如果你想加上日期标签，可以自行扩展
+            ghcr.io/kevin-yst-du/rustdesk-builder:latest
+          # 新增：使用 GitHub Actions 专用缓存
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
